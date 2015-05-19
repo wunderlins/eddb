@@ -31,23 +31,6 @@ Data file description:
   - y FLT -- -83.53125,
   - z FLT -- -30.8125
 
-CREATE TABLE systems (
-	id BIGINT PRIMARY KEY, -- 1,
-	allegiance STRING, -- "Empire",
-	faction STRING, -- "Empire League",
-	government STRING, -- "Patronage",
-	name STRING, -- "1 G. Caeli",
-	needs_permit BOOLEAN, -- 0,
-	population BIGINT, -- 6544826,
-	primary_economy STRING, -- "Industrial",
-	security STRING, -- "Medium",
-	state STRING, -- "None",
-	updated_at DATETIME, -- 1430931668,
-	x DOUBLE, -- 80.90625,
-	y DOUBLE, -- -83.53125,
-	z DOUBLE -- -30.8125
-);
-
 * stations.js (Array)
   - ARR STR economies --[], ? list of strings, convert to int
   - ARR STR export_commodities --[], list of strings, convert to int
@@ -155,11 +138,17 @@ CREATE TABLE station2import (
 
 """
 
-import json, config
+import json, config, sys
+import datetime
 
 class parse():
 	_con = None
 	_cur = None
+
+	@staticmethod
+	def log(str):
+		sys.stdout.write(str)
+		sys.stdout.flush()
 	
 	@staticmethod
 	def _dbconn():
@@ -176,22 +165,40 @@ class parse():
 		#print "%d, %d" % (l, size)
 		while (len(list) <= size):
 			list.append(None)
+
+	@staticmethod
+	def load_data(file):
+		# load data to memory
+		fp = open(file, "r")
+		data = json.load(fp)
+		fp.close()
+		return data
 	
 	@staticmethod
 	def commodities():
 		# load data to memory
-		fp = open("commodities.json", "r")
-		data = json.load(fp)
-		fp.close()
+		f = "commodities.json"
+		parse.log("Parsing file %s ... " % f)
+		data = parse.load_data(f)
 		
 		# loop over properties
 		categories = []
+		commodities = []
 		for e in data:
 			#print e["category"]["id"]
 			parse._listexpand(categories, e["category"]["id"])
 			categories[e["category"]["id"]] = e["category"]["name"]
 			
-		# return modified data
+			commodities.append((
+				e["id"],
+				e["average_price"],
+				e["category_id"],
+				e["name"]
+			))
+		parse.log("done.\n")
+		#print commodities
+		
+		# get connection
 		(con, cur) = parse._dbconn()
 		
 		# create a list of tuples containing all values
@@ -201,16 +208,97 @@ class parse():
 			categories_sqldata.append((x, categories[x]))
 			count += 1
 		
+		parse.log("Importing file %s ... " % f)
+		
+		# insert categories
+		#print categories_sqldata
+		cur.execute("DELETE FROM category")
 		cur.executemany("INSERT INTO category (id, name) VALUES (?, ?)", categories_sqldata)
 		con.commit()
 		
-		print categories_sqldata
+		# insert commodities
+		cur.execute("DELETE FROM commodity")
+		sql = "INSERT INTO commodity (id, average_price, category_id, name) VALUES (?,?,?,?)"
+		cur.executemany(sql, commodities)
+		con.commit()
+		
+		parse.log("done.\n")
+		
+		#print categories_sqldata
 
+	@staticmethod
+	def system():
+		# load data to memory
+		f = "systems.json"
+		parse.log("Parsing file %s ... " % f)
+		data = parse.load_data("systems.json")
+		
+		# get connection
+		(con, cur) = parse._dbconn()
+		
+		systems = []
+		for r in data:
+			systems.append((
+				r["allegiance"], # : "Federation",
+				r["faction"], # : "Values Party of 1 Hydrae",
+				r["government"], # : "Democracy",
+				r["id"], # : 3,
+				r["name"], # : "1 Hydrae",
+				r["needs_permit"], # : 0,
+				r["population"], # : 4294967295,
+				r["primary_economy"], # : "Agriculture",
+				r["security"], # : "High",
+				r["state"], # : "None",
+				datetime.datetime.fromtimestamp(int(r["updated_at"])), # : 1430938502,
+				r["x"], # : 60.90625,
+				r["y"], # : 28.53125,
+				r["z"] # : -54.90625
+			))
+			
+			if len(systems[len(systems)-1]) != 14:
+				print systems[len(systems)-1]
+			
+		parse.log("done.\n")
+		
+		"""
+		for l in systems:
+			print l
+		"""
+		
+		# get connection
+		(con, cur) = parse._dbconn()
+		
+		parse.log("Importing file %s ... " % f)
+		
+		# insert systems
+		cur.execute("DELETE FROM system")
+		cur.executemany("""INSERT INTO system (
+			allegiance, 
+			faction, 
+			government, 
+			id, 
+			name, 
+			needs_permit, 
+			population, 
+			primary_economy, 
+			security, 
+			state, 
+			updated_at, 
+			x, 
+			y, 
+			z) 
+		VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+		""", systems)
+		con.commit()
+		
+		parse.log("done.\n")
+		
 def main():
 	"""
 	parse downlaoded files
 	"""
 	parse.commodities()
+	parse.system()
 	
 if __name__ == "__main__":
 	main()
