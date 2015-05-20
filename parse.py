@@ -5,62 +5,6 @@ echo "$el" | sed -e 's/ \+- //; s/INT/BIGINT/; s/STR/STRING/; s/ --/, --/; s/PK/
 
 Data file description:
 
-* commodities.json (Array)
-  - DIC category
-    - id INT PK
-    - name STR
-  
-  - id INT PK
-  - average_price INT
-  - category_id INT
-  - name STR
-
-* systems.json (Array)
-  - id INT PK -- 1,
-  - allegiance STR -- "Empire",
-  - faction STR -- "Empire League",
-  - government STR -- "Patronage",
-  - name STR -- "1 G. Caeli",
-  - needs_permit BOL -- 0,
-  - population INT -- 6544826,
-  - primary_economy STR -- "Industrial",
-  - security STR -- "Medium",
-  - state STR -- "None",
-  - updated_at TST -- 1430931668,
-  - x FLT -- 80.90625,
-  - y FLT -- -83.53125,
-  - z FLT -- -30.8125
-
-* stations.js (Array)
-  - ARR STR economies --[], ? list of strings, convert to int
-  - ARR STR export_commodities --[], list of strings, convert to int
-  - ARR STR import_commodities --[], list of strings, convert to int
-
-  - DIC listings -- these are the commodities informations
-    - id INT PK --87,
-    - buy_price INT --223,
-    - collected_at INT --1431043003,
-    - commodity_id INT --1,
-    - demand INT --0,
-    - sell_price INT --207,
-    - station_id INT --3,
-    - supply INT --46197,
-    - update_count INT --"2"
-  
-  - id INT PK --1,
-  - allegiance STR --null,
-  - distance_to_star INT --16253,
-  - faction STR --"",
-  - government STR --null,
-  - has_blackmarket BOL --0,
-  - has_commodities BOL --1,
-  - has_outfitting BOL --null,
-  - has_rearm BOL --null,
-  - has_refuel BOL --null,
-  - has_repair BOL --null,
-  - has_shipyard BOL --null,
-
-
 -- commodities
 CREATE TABLE category (
 	id BIGINT PRIMARY KEY, 
@@ -116,7 +60,14 @@ CREATE TABLE station (
 	has_rearm BOOLEAN, --null,
 	has_refuel BOOLEAN, --null,
 	has_repair BOOLEAN, --null,
-	has_shipyard BOOLEAN --null
+	has_shipyard BOOLEAN, --null
+	
+	state STRING, --"None",
+	system_id BIGINT, --: 7358,
+	type STRING, -- "Commercial Outpost",
+	updated_at BIGINT, -- 1431043155
+	max_landing_pad_size STRING, -- : "M",
+	name STRING -- "Gehry Dock",
 );
 
 CREATE TABLE economy (
@@ -128,6 +79,10 @@ CREATE TABLE station2economy (
 	station_id BIGINT
 );
 CREATE TABLE station2export (
+	commodity_id BIGINT, 
+	station_id BIGINT
+);
+CREATE TABLE station2prohibited (
 	commodity_id BIGINT, 
 	station_id BIGINT
 );
@@ -231,7 +186,7 @@ class parse():
 		# load data to memory
 		f = "systems.json"
 		parse.log("Parsing file %s ... " % f)
-		data = parse.load_data("systems.json")
+		data = parse.load_data(f)
 		
 		# get connection
 		(con, cur) = parse._dbconn()
@@ -292,6 +247,256 @@ class parse():
 		con.commit()
 		
 		parse.log("done.\n")
+
+	@staticmethod
+	def get_id(name, arr, reverse):
+		index = None
+		try:
+			index = arr.index(name)
+		except:
+			arr.append(name)
+			index = arr.index(name)
+			reverse[name] = index
+		
+		return index
+
+	@staticmethod
+	def get_index(el, obj):
+		try:
+			return obj[el]
+		except:
+			return None
+	
+	@staticmethod
+	def station():
+		# get connection
+		(con, cur) = parse._dbconn()
+		
+		# get all commodities
+		sql = "SELECT id, name FROM commodity"
+		cur.execute(sql)
+		res = cur.fetchall()
+		commodities = {}
+		for id, val in res:
+			#print "  %d, %s" % (id, val)
+			commodities[val] = id
+		#print commodities
+		#return
+		
+		# load data to memory
+		f = "stations.json"
+		parse.log("Parsing file %s ... " % f)
+		data = parse.load_data(f)
+		
+		station = []
+		economies = [None]
+		economies_rev = {"None": 0}
+		#commodities = []
+		economies_arr = []
+		commodities_export = []
+		commodities_import = []
+		commodities_prohibited = []
+		
+		listings = []
+		
+		for r in data:
+			
+			# insert commodities
+			for e in r["economies"]:
+				i = parse.get_id(e, economies, economies_rev)
+				economies_arr.append((r["id"], i))
+				#print "  %d, %s" % (i, e)
+			
+			# lookup all export/import commodities' ids
+			for e in r["export_commodities"]:
+				commodities_export.append((r["id"], parse.get_index(e, commodities)))
+			for e in r["import_commodities"]:
+				commodities_import.append((r["id"], parse.get_index(e, commodities)))
+			# lookup prohibited commodities
+			for e in r["prohibited_commodities"]:
+				commodities_prohibited.append((r["id"], parse.get_index(e, commodities)))
+			
+			# insert station
+			station.append((
+				r["id"],
+				r["allegiance"],
+				r["distance_to_star"],
+				r["faction"],
+				r["government"],
+				r["has_blackmarket"],
+				r["has_commodities"],
+				r["has_outfitting"],
+				r["has_rearm"],
+				r["has_refuel"],
+				r["has_repair"],
+				r["has_shipyard"],
+				r["state"],
+				r["system_id"],
+				r["type"],
+				r["updated_at"],
+				r["max_landing_pad_size"],
+				r["name"]
+			))
+			
+			# build a list of commodities for later insertion
+			"""
+        "listings": [
+            {
+                "buy_price": 223,
+                "collected_at": 1431043003,
+                "commodity_id": 1,
+                "demand": 0,
+                "id": 87,
+                "sell_price": 207,
+                "station_id": 3,
+                "supply": 46197,
+                "update_count": "2"
+            }
+			"""
+			for e in r["listings"]:
+				listings.append((
+					e["buy_price"], #: 223,
+					e["collected_at"], #: 1431043003,
+					e["commodity_id"], #: 1,
+					e["demand"], #: 0,
+					e["id"], #: 87,
+					e["sell_price"], #: 207,
+					e["station_id"], #: 3,
+					e["supply"], #: 46197,
+					e["update_count"] #: "2"
+				))
+		
+		#print commodities_export
+		
+		eco = []
+		for index, item in enumerate(economies):
+			if index == 0:
+				continue
+			#print "%d, %s" % (index, item)
+			eco.append((index, item))
+		
+		sql = """ INSERT INTO station (
+			id,
+			allegiance, -- STRING, --null,
+			distance_to_star, -- STRING, --null, BIGINT, --16253,
+			faction, -- STRING, --null, STRING, --"",
+			government, -- STRING, --null, STRING, --null,
+			has_blackmarket, -- STRING, --null, BOOLEAN, --0,
+			has_commodities, -- STRING, --null, BOOLEAN, --1,
+			has_outfitting, -- STRING, --null, BOOLEAN, --null,
+			has_rearm, -- STRING, --null, BOOLEAN, --null,
+			has_refuel, -- STRING, --null, BOOLEAN, --null,
+			has_repair, -- STRING, --null, BOOLEAN, --null,
+			has_shipyard, -- STRING, --null, BOOLEAN, --null
+			state, -- STRING, --null, STRING, --"None",
+			system_id, -- STRING, --null, BIGINT, --: 7358,
+			type, -- STRING, --null, STRING, -- "Commercial Outpost",
+			updated_at, -- STRING, --null, BIGINT, -- 1431043155
+			max_landing_pad_size, -- STRING, --null, STRING, -- : "M",
+			name -- STRING, --null, STRING -- "Gehry Dock",
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+		
+		cur.execute("DELETE FROM station")
+		cur.execute("DELETE FROM listing")
+		cur.execute("DELETE FROM economy")
+		cur.execute("DELETE FROM station2economy")
+		cur.execute("DELETE FROM station2export")
+		cur.execute("DELETE FROM station2import")
+		cur.execute("DELETE FROM station2prohibited")
+		
+		cur.executemany(sql, station)
+		sql = "INSERT INTO station2economy (station_id, economy_id) VALUES (?, ?)"
+		cur.executemany(sql, economies_arr)
+		
+		sql = "INSERT INTO economy (id, name) VALUES (?, ?)"
+		cur.executemany(sql, eco)
+		
+		sql = "INSERT INTO station2export (station_id, commodity_id) VALUES (?, ?)"
+		cur.executemany(sql, commodities_export)
+		
+		sql = "INSERT INTO station2import (station_id, commodity_id) VALUES (?, ?)"
+		cur.executemany(sql, commodities_import)
+		
+		sql = "INSERT INTO station2prohibited (station_id, commodity_id) VALUES (?, ?)"
+		cur.executemany(sql, commodities_import)
+		
+		sql = """INSERT INTO listing (
+						buy_price, --": 223,
+						collected_at, -- ": 1431043003,
+						commodity_id, -- ": 1,
+						demand, -- ": 0,
+						id, -- ": 87,
+						sell_price, -- ": 207,
+						station_id, -- ": 3,
+						supply, -- ": 46197,
+						update_count -- ": "2"
+
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+		cur.executemany(sql, listings)
+		con.commit()
+		
+		parse.log("done.\n")
+
+		"""		
+    {
+        "id": 3,
+        "state": "None",
+        "system_id": 7358,
+        "type": "Commercial Outpost",
+        "updated_at": 1431043155
+        "allegiance": "Empire",
+        "faction": "Empire Consulate",
+        "government": "Patronage",
+        "has_blackmarket": 0,
+        "has_commodities": 1,
+        "has_outfitting": 0,
+        "has_rearm": 0,
+        "has_refuel": 0,
+        "has_repair": 1,
+        "has_shipyard": 0,
+        "distance_to_star": 3908,
+        "max_landing_pad_size": "M",
+        "name": "Gehry Dock",
+        
+        "economies": [
+            "High Tech",
+            "Refinery"
+        ],
+        "export_commodities": [
+            "Aluminium",
+            "Copper",
+            "Titanium"
+        ],
+        
+        "import_commodities": [
+            "Mineral Oil",
+            "Bauxite",
+            "Rutile"
+        ],
+        "prohibited_commodities": [
+            "Narcotics",
+            "Combat Stabilisers",
+            "Slaves",
+            "Personal Weapons",
+            "Battle Weapons",
+            "Toxic Waste"
+        ],
+        
+        "listings": [
+            {
+                "buy_price": 223,
+                "collected_at": 1431043003,
+                "commodity_id": 1,
+                "demand": 0,
+                "id": 87,
+                "sell_price": 207,
+                "station_id": 3,
+                "supply": 46197,
+                "update_count": "2"
+            }
+        ],
+    } """
+			
 		
 def main():
 	"""
@@ -299,6 +504,7 @@ def main():
 	"""
 	parse.commodities()
 	parse.system()
+	parse.station()
 	
 if __name__ == "__main__":
 	main()
