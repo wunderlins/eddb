@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import readline
+
+commands = ['station', 'system']
+
+def completer(text, state):
+	""" we get state from 0-3 and text contains the entered srting """
+	#print state
+		
+	options = [x for x in commands if x.startswith(text)]
+	try:
+		return options[state]
+	except IndexError:
+		return None
+
+readline.set_completer(completer)
+readline.parse_and_bind("tab: complete")
+
+while 1:
+    a = raw_input("> ")
+    print "You entered", a
