@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 
+"""
 import readline
-import sqlite3
-import config
-
-con = sqlite3.connect(config.db)
-cur = con.cursor()
 
 #commands = ['station', 'system']
 
 def completer(text, state):
-	""" we get state from 0-3 and text contains the entered srting """
+	" "" we get state from 0-3 and text contains the entered srting "" "
 	#print state
 	
 		
@@ -41,3 +37,79 @@ readline.set_completer_delims(' \t\n...@#$%^&*()-=+[{]}\\|;:\'",<>?')
 while 1:
     a = raw_input("> ")
     print "You entered", a
+"""
+
+import cmd
+import sqlite3
+import config
+
+con = sqlite3.connect(config.db)
+cur = con.cursor()
+
+addresses = [
+    'here@blubb.com',
+    'foo@bar.com',
+    'whatever@wherever.org',
+]
+
+def get_systems(text):
+	# do a database query, find all available systems
+	sql = "SELECT name FROM system WHERE name LIKE '"+text+"%'"
+	cur.execute(sql)
+	res = cur.fetchall()
+	options = []
+	for name in res:
+		#print "  %d, %s" % (id, val)
+		options.append(name[0])
+	return options
+
+class MyCmd(cmd.Cmd):
+	prompt = "None > : "
+	
+	"""
+	def parseline(self, line):
+		print 'parseline(%s) =>' % line,
+		ret = cmd.Cmd.parseline(self, line)
+		print ret
+		return ret
+	"""
+	
+	def do_system(self, line):
+		self.prompt = line + " > : "
+
+	def do_station(self, line):
+		pass
+
+	def complete_system(self, text, line, start_index, end_index):
+		search = line[7:]
+		tmp_tokens = line.split(' ')
+		tokens = []
+		for e in tmp_tokens:
+			if e == "":
+				continue
+			tokens.append(e)
+		
+		#print tokens
+		#print ""
+		#print "%s, %s, %d, %d, %d" % (line, search, start_index, end_index, len(tokens))
+		
+		if line and len(line) > 2+7:
+			if len(tokens) == 2:
+				return get_systems(search)
+			else:
+				ret = []
+				sy = get_systems(search)
+				#print sy
+				for e in sy:
+					start = len(tokens[1])+1
+					#print start
+					ret.append(e[start:])
+				
+				return ret
+			
+		else:
+			return []
+
+if __name__ == '__main__':
+	my_cmd = MyCmd()
+	my_cmd.cmdloop()
