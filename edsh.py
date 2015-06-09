@@ -128,5 +128,6 @@ class MyCmd(cmd.Cmd):
 			return []
 
 if __name__ == '__main__':
+	print os.getenv("COLUMNS")
 	my_cmd = MyCmd()
 	my_cmd.cmdloop()
