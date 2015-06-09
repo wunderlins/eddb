@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 Elite Dangerous DataBase Shell - short edsh (eddb is the name of the database)
 
@@ -12,6 +13,7 @@ import sqlite3
 import config
 import os
 import reload
+import math
 
 con = sqlite3.connect(config.db)
 cur = con.cursor()
@@ -60,7 +62,7 @@ def colorize(string, color):
 	
 
 class MyCmd(cmd.Cmd):
-	
+	colwidth = 18
 	intro = colorize("""Welcome to edsh
 """, "Purple")
 	
@@ -73,7 +75,12 @@ class MyCmd(cmd.Cmd):
 		print ret
 		return ret
 	"""
-	
+
+	def do_EOF(self, line):
+		"""catch CTRL-D, exit"""
+		print "" # must add a newline
+		return True
+        	
 	def do_system(self, line):
 		# FIXME: validate system name, only use it if found
 		self.prompt = colorize(line.title(), "Light Blue") + " > : "
@@ -85,11 +92,29 @@ class MyCmd(cmd.Cmd):
 		# FIXME: reloading base class does not work
 		reload.recompile("edsh")
 	
+	def do_colwidth(self, line):
+		self.colwidth = int(line)
+		print colorize("Column width set to %d characters" % self.colwidth, "Cyan")
+	
 	def do_find(self, line):
+		width = int(os.getenv("COLUMNS"))
+		colwidth = self.colwidth
+		nlat = math.floor(width * 1.0 / colwidth)
+		#print "colwidth: %d, width: %d, nlat: %d" % (colwidth, width, nlat)
 		systems = find(line)
+		counter=1
 		for s in systems:
-			sys.stdout.write("%-15s" % s)
+			l = len(s)
+			mask = "%-"+str(colwidth-1)+"s "
+			out = s
+			if l+1 > colwidth:
+				out = out[0:colwidth-2] + u"…"
+			sys.stdout.write(mask % out)
+			if counter % nlat == 0:
+				sys.stdout.write("\n")
+			counter += 1
 		#print systems
+		return None
 	
 	def complete_system(self, text, line, start_index, end_index):
 		search = line[7:]
@@ -120,6 +145,7 @@ class MyCmd(cmd.Cmd):
 					start = len(tokens[1])+1
 					ret.append(e[start:])
 					"""
+					# FIXME: if system name is equal to the whole line, return
 					ret.append(e[srchstr_l+1:])
 				
 				return ret
@@ -128,6 +154,5 @@ class MyCmd(cmd.Cmd):
 			return []
 
 if __name__ == '__main__':
-	print os.getenv("COLUMNS")
 	my_cmd = MyCmd()
 	my_cmd.cmdloop()
