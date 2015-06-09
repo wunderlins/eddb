@@ -4,6 +4,6 @@ mv eddb.dat eddb-$(date "+%Y%m%d").dat > /dev/null 2>&1
 sqlite3 eddb.dat < schema.sql 
 
 ./downloader.py
-./pasrse.py
+./parse.py
 
 
