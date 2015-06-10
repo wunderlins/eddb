@@ -3,8 +3,20 @@
 """
 Elite Dangerous DataBase Shell - short edsh (eddb is the name of the database)
 
+interesting example code can be foudn here:
+https://bitbucket.org/kfsone/tradedangerous/src
 
-
+command line ideas:
+$ set station <nameofstation> # wil lset the active station
+$ set system <name of system> # dito system
+$ search <search term> # will find stations and systems
+$ search commodity <commdoity name> # will find commodieies in a certain radius
+$ set option <name> <value>
+...          commodity <commdoity name>
+...          radius <distance in ly>
+...          <sell|buy>
+$ distance <target system> # calculate distance from selected to target
+$ distance <source system> <target system> # calculate distance from source to target
 """
 
 import sys
