@@ -30,12 +30,6 @@ import math
 con = sqlite3.connect(config.db)
 cur = con.cursor()
 
-addresses = [
-    'here@blubb.com',
-    'foo@bar.com',
-    'whatever@wherever.org',
-]
-
 def get_systems(text):
 	# do a database query, find all available systems
 	sql = "SELECT name FROM system WHERE name LIKE '"+text+"%'"
@@ -88,6 +82,14 @@ class MyCmd(cmd.Cmd):
 		return ret
 	"""
 
+	def cmdloop(self):
+		try:
+			cmd.Cmd.cmdloop(self)
+		except KeyboardInterrupt as e:
+			#print "CTRL-C detected"
+			print "" # exiting readline mode probably, add a newline
+			sys.exit(127)
+	
 	def do_EOF(self, line):
 		"""catch CTRL-D, exit"""
 		print "" # must add a newline
@@ -107,6 +109,12 @@ class MyCmd(cmd.Cmd):
 	def do_colwidth(self, line):
 		self.colwidth = int(line)
 		print colorize("Column width set to %d characters" % self.colwidth, "Cyan")
+	
+	def do_set(self, line):
+		print "i should do something with this data now"
+		
+	def complete_set(self, text, line, start_index, end_index):
+		print line
 	
 	def do_find(self, line):
 		width = int(os.getenv("COLUMNS"))
@@ -164,7 +172,10 @@ class MyCmd(cmd.Cmd):
 			
 		else:
 			return []
-
+def start():
+	my_cmd = MyCmd()
+	my_cmd.cmdloop()
+	
 if __name__ == '__main__':
 	my_cmd = MyCmd()
 	my_cmd.cmdloop()
