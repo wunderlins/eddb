@@ -102,10 +102,6 @@ class MyCmd(cmd.Cmd):
 	def do_station(self, line):
 		pass
 	
-	def do_reload(self, line):
-		# FIXME: reloading base class does not work
-		reload.recompile("edsh")
-	
 	def do_colwidth(self, line):
 		self.colwidth = int(line)
 		print colorize("Column width set to %d characters" % self.colwidth, "Cyan")
